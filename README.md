@@ -16,7 +16,7 @@ for users using token
 ## How to run: ##
 ```
 move credentials.ini into meetings folder
-move client secrets file into proj10-meet_times folder
+move client secrets file into meetings folder
 make install
 make run
 Ctrl+C to quit
