@@ -10,8 +10,8 @@ times. Users who are given a token can't change primary information about the
 meeting, which includes date range, beginning and end time, but are able to 
 select calendars and submit their freetimes.
 ## Not Finished: ##
-1.Finding overlapping times using database entries
-2.Displaying information from database of meeting datarange/begin & end times 
+1. Finding overlapping times using database entries
+2. Displaying information from database of meeting datarange/begin & end times 
 for users using token
 ## How to run: ##
 ```
