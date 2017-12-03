@@ -32,10 +32,8 @@
 
 </head>
 
-<br>
+<body>
 <div class="container">
-
-<h1>Meeting Finder</h1>
 
 <!--
   -- If there are any warnings or other messages from a prior action,
@@ -53,39 +51,28 @@
   {% endif %}
 {% endwith %}
 
-<label>Create New Meeting:</label>
-    <form method="get" action="/create">
-    <button type="submit">Create</button>
-    </form>
+<h5>Token:</h5>
+  {{session.token}}
+<br><h5>Instructions:</h5>
+Send to others to narrow down the possible meetings.
+<br>
+Keep to access Possible meeting times again.
 
-    <br><textarea name="token" id="token" rows="1" style="width: 20%;"></textarea>
-    <br><button id="edit_button">Edit Existing</button>
-
-    <script type="text/javascript">
-
-  var SCRIPT_ROOT = {{ request.script_root|tojson|safe }} ;
-  var EDIT = SCRIPT_ROOT + "/token";
-
-  document.getElementById("edit_button").onclick = function () {
-    console.log("Edit button clicked");
-    var token = document.getElementById('token').value;
-    console.log(token);
-    $.ajax({
-      url: EDIT,
-      data: {token: token},
-      success: function(data){
-        console.log("Add: Got a response!");
-        if (data.result.valid === true){
-            location.href = "/edit";
-        }else{
-            location.href = "/"
-        }
-      }
-    });
-  };
-
-</script>
-
+<h5>Possible Times:</h5>
+{% if session.possible is defined  %}
+  <div class="row">
+  {% for events in session.possible %}
+      {% for event in events %}
+              <div class="col-md-4">
+                  <h6>Meeting:</h6>
+                  Date: {{ event.start | fmtdate }}
+                  Start: {{ event.start | fmttime }}
+                  End: {{ event.end | fmttime }}
+              </div>
+      {% endfor %}
+  {% endfor %}
+  </div>
+{% endif %}
 
   </div>  <!-- container (for bootstrap) -->
   </body> </html>

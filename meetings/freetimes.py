@@ -2,7 +2,13 @@
 import flask
 import logging
 import arrow
-from flask_main import interpret_time, interpret_date
+import os
+import binascii
+from flask_main import interpret_time, interpret_date, CONFIG, collection, db, dbclient
+
+
+def generate_key():
+    return binascii.hexlify(os.urandom(10)).decode()
 
 def list_events(service, calendar):
     """
@@ -103,3 +109,82 @@ def addFreetime(list, start, end, hours, minutes):
                 "duration": str(hours) + " hours " + str(minutes) + " mins"
             })
         logging.debug("Found Freetime: " + str(hours) + " hours " + str(minutes) + " mins")
+
+def findPossible(token, otherTimes):
+    """
+    Could not finish/get working
+
+    Grab possible meeting times from DB, and then compare
+    them to find overlapping times. Update DB with the new
+    overlapping times.
+    """
+    cursor = collection.find({'token': token}, {'possible': 1})
+    possible = []
+    # counter = 0
+    # for event in freetimes:
+    #     print(event)
+    #     for otherEvent in otherTimes[counter]:
+    #         if arrow.get(event["start"]) >= arrow.get(otherEvent["start"]):
+    #             newStart = event["start"]
+    #         else:
+    #             newStart = otherEvent["start"]
+    #
+    #         if arrow.get(event["end"]) >= arrow.get(otherEvent["end"]):
+    #             newEnd = otherEvent["end"]
+    #         else:
+    #             newEnd = event["end"]
+    #
+    #         hours, minutes, start, end = getDiff(newStart, newEnd)
+    #         addFreetime(possible, start, end, hours, minutes)
+    # counter = counter + 1
+    # updateMeeting(token, possible)
+    return possible
+
+def addMeeting(freetimes):
+    """
+    Generate unique token, and add possible meetings to DB
+    """
+    logging.debug("Got a Meeting")
+    token = generate_key()
+
+    newMeeting ={"type": "meetings",
+                 "possible": freetimes,
+                 "daterange": flask.session['daterange'],
+                 "begin_date": flask.session['begin_date'],
+                 "end_date": flask.session['end_date'],
+                 "begin_time": flask.session['begin_time'],
+                 "end_time": flask.session['end_time'],
+                 "token": token}
+    try:
+        collection.insert_one(newMeeting)
+        logging.debug("added a meeting")
+    except:
+        logging.debug("Could not add meeting")
+
+    return token
+
+def delMeeting(token):
+    """
+    Delete meeting using unique token
+    """
+    logging.debug("Got a Token")
+
+    try:
+        collection.delete_one({"token": token})
+        logging.debug("removed a meeting")
+    except:
+        logging.debug("could not remove meeting")
+
+def updateMeeting(token, freetimes):
+    """
+    Update meeting using unique token
+    """
+    logging.debug("Got a Token")
+
+    try:
+        db.inventory.update_one(
+            {"token": token},
+            {"$set": {"freetimes": freetimes}})
+        logging.debug("updated a meeting")
+    except:
+        logging.debug("could not update meeting")

@@ -16,6 +16,7 @@ import httplib2  # used in oauth2 flow
 
 # Google API for services 
 from apiclient import discovery
+from pymongo import MongoClient
 
 from freetimes import *
 ###
@@ -37,6 +38,25 @@ SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
 CLIENT_SECRET_FILE = CONFIG.GOOGLE_KEY_FILE  ## You'll need this
 APPLICATION_NAME = 'MeetMe class project'
 
+MONGO_CLIENT_URL = "mongodb://{}:{}@{}:{}/{}".format(
+    CONFIG.DB_USER,
+    CONFIG.DB_USER_PW,
+    CONFIG.DB_HOST,
+    CONFIG.DB_PORT,
+    CONFIG.DB)
+
+
+print("Using URL '{}'".format(MONGO_CLIENT_URL))
+
+try:
+    dbclient = MongoClient(MONGO_CLIENT_URL)
+    db = getattr(dbclient, CONFIG.DB)
+    collection = db.meetings
+
+except:
+    print("Failure opening database.  Is Mongo running? Correct password?")
+    sys.exit(1)
+
 
 #############################
 #
@@ -48,18 +68,22 @@ APPLICATION_NAME = 'MeetMe class project'
 @app.route("/index")
 def index():
     app.logger.debug("Entering index")
-    if 'begin_date' not in flask.session:
-        init_session_values()
     return render_template('index.html')
 
+@app.route("/create")
+def create():
+    if 'begin_date' not in flask.session:
+        init_session_values()
+    return flask.redirect(flask.url_for("choose"))
 
 @app.route("/choose")
 def choose():
     ## We'll need authorization to list calendars 
     ## I wanted to put what follows into a function, but had
     ## to pull it back here because the redirect has to be a
-    ## 'return' 
+    ## 'return'
     app.logger.debug("Checking credentials for Google calendar access")
+
     credentials = valid_credentials()
     if not credentials:
         app.logger.debug("Redirecting to authorization")
@@ -82,8 +106,70 @@ def choose():
         app.logger.debug("No calendars selected")
 
 
-    return render_template('index.html')
+    return render_template('create.html')
 
+
+@app.route("/edit")
+def edit():
+    app.logger.debug("Checking credentials for Google calendar access")
+
+    credentials = valid_credentials()
+    if not credentials:
+        app.logger.debug("Redirecting to authorization")
+        return flask.redirect(flask.url_for('oauth2callback'))
+
+    gcal_service = get_gcal_service(credentials)
+    app.logger.debug("Returned from get_gcal_service")
+    flask.g.calendars = list_calendars(gcal_service)
+
+    events = []
+    freetimes = []
+    try:
+        for calendar in flask.session['ids']:
+            found_events, found_freetimes = list_events(gcal_service, calendar)
+            events.append(found_events)
+            freetimes.append(found_freetimes)
+        flask.session["events"] = events
+        flask.session["freetimes"] = freetimes
+    except:
+        app.logger.debug("No calendars selected")
+    return render_template('edit.html')
+
+@app.route("/token")
+def token():
+    app.logger.debug("Got a Token")
+    token = request.args.get('token')
+    rslt = {"valid": ""}
+    if collection.find_one({"token": token}) is not None:
+        flask.session["token"] = token
+        app.logger.debug("Valid Token")
+        rslt["valid"] = True
+    else:
+        flask.flash("Not a valid Token")
+        app.logger.debug("Not Valid Token")
+        rslt["valid"] = False
+    return flask.jsonify(result=rslt)
+
+@app.route("/final")
+def final():
+    '''
+    Could not finish find possible overlapping times
+
+    Check to see if a token is in session, if it isn't add meeting,
+    and create a new token, else find possible overlapping free times.
+    '''
+    try:
+        if flask.session["token"] is not None:
+            # possible = findPossible(flask.session["token"], flask.session["freetimes"])
+            # flask.session["possible"] = possible
+            pass
+    except:
+        app.logger.debug("No Token, adding meeting")
+        token = addMeeting(flask.session["freetimes"])
+        flask.session["token"] = token
+        flask.session["possible"] = flask.session["freetimes"]
+
+    return render_template('final.html')
 
 ####
 #
